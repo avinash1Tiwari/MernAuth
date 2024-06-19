@@ -16,5 +16,10 @@ console.log("routes")
 router.post('/signup',userController.signUp)
 router.post('/login',userController.logIn)
 router.get("/getuserdetails",userController.verifyToken,userController.getUser)
+// router.get('/getuserdetails',(req,res)=>{
+//     res.status(200).json({
+//         message : "successfully connected to fontend-auth"
+//     })
+// })
 
 module.exports = router

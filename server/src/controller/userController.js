@@ -9,7 +9,9 @@ const signUp = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    
+    console.log("req.body")
+    console.log(req.body)
+    console.log("req.body")
 
     let existingUser;
 
