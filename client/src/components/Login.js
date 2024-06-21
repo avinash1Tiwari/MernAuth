@@ -55,6 +55,7 @@ const Login = () => {
 
         // sendRequest()
 
+    // sendRequest();
     sendRequest().then(()=>history('/user'));
 
         console.log("loginData")

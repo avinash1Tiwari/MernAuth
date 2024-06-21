@@ -3,7 +3,9 @@ const User = require("../models/User");
 const { message } = require("telegraf/filters");
 const bcrypt = require("bcrypt");
 const jwt = require('jsonwebtoken')
-const {ServerConfig} = require('../config')
+const {ServerConfig} = require('../config');
+const { SECRETE_KEY } = require("../config/server-config");
+const serverConfig = require("../config/server-config");
 
 const signUp = async (req, res) => {
   try {
@@ -62,6 +64,9 @@ const signUp = async (req, res) => {
   }
 };
 
+
+
+
 const logIn = async (req,res) =>{
     
     const {email,password} = req.body;
@@ -101,10 +106,19 @@ const logIn = async (req,res) =>{
 
             const token = jwt.sign({id:existingUser._id , email:existingUser.email} ,ServerConfig.SECRETE_KEY,{expiresIn:ServerConfig.JWT_EXPIRE_TIME} )
 
+
+            console.log("Generated token : ",token)
+
+            // if cookie already present => then remove cookie first then set cookie again(this concept is added b/c as we refresh our cookie agai and agin every after 30-seconds)
+            if(req.cookies[`${existingUser._id}`])
+              {
+                req.cookies[`${existingUser._id}`] = "";
+              }
+
             // cookie generation from backend
             res.cookie(String(existingUser._id),token,{
               path : '/',
-              expires : new Date(Date.now() + 1000*30),
+              expires : new Date(Date.now() + 1000*35),
               httpOnly : true,
               sameSite : 'lax'
 
@@ -128,50 +142,14 @@ const logIn = async (req,res) =>{
 
 
 
-// 1. verify token by accessing token from fontend from bearer-token,authorisation-part.
-
-// const verifyToken = async (req,res,next) =>{
-
-//   const headers = req.headers['authorization'];
-
-//   const token = headers.split(" ")[1];
-
-//   if(!token)
-//     {
-//       res.status(404).json({
-//         success : false,
-//         message : "Token not presnt"
-//       })
-//     }
-
-//     // if token present => verify it with jwt
-//     jwt.verify(String(token),ServerConfig.SECRETE_KEY,(err,user)=>{
-//       if(err){
-//         return res.status(404).json({
-//           success : false,
-//           error : new Error(err)
-//         })
-//       }
-
-   
-//       // const userId = user.id;
-//       // console.log("userId_verify");
-//       // console.log(userId);
-//       req.id = user.id;
-
-//       // calling next middleware
-//       next()
-//     })
-// }
-
-
-
-
-// 2. accessing bearer token from cookie, instead of passing token from frontend as client request
+//  accessing bearer token from cookie, instead of passing token from frontend as client request
 
 const verifyToken = async (req,res,next) =>{
 
   const cookies = req.headers.cookie;
+
+  console.log("cookies")
+  console.log(cookies)
 
   if(!cookies)
     {
@@ -214,6 +192,7 @@ const verifyToken = async (req,res,next) =>{
 }
 
 
+
 const getUser = async (req,res)=>{
 
   // console.log(req._id)
@@ -246,9 +225,62 @@ const getUser = async (req,res)=>{
   })
 }
 
+
+
+const refreshToken = async(req,res,next)=>{
+
+  // console.log("request refresh")
+  // console.log(req.headers)
+
+  const cookies = req.headers.cookie;
+
+ 
+  if(!cookies){
+    return res.status(400).json({
+      message:"Couldn't find token"
+    })
+  }
+  const previousToken = await cookies.split("=")[1];
+
+  
+
+  jwt.verify(String(previousToken),serverConfig.SECRETE_KEY,(err,user)=>{
+    if(err){
+      console.log(err);
+      return res.status(403).json({
+        message : "Authentication failed"
+      })
+    }
+
+    res.clearCookie(`${user.id}`);
+    req.cookies[`${user.id}`] = "";
+
+    const token = jwt.sign({id:user.id},serverConfig.SECRETE_KEY,{
+      expiresIn:serverConfig.JWT_EXPIRE_TIME
+    })
+
+    console.log("Re-enerated token : ",token)
+
+    res.cookie(String(user.id),token,{
+      path : "/",
+      expires : new Date(Date.now() + 1000*30),  // 30 second
+      httpOnly :true,
+      sameSite : 'lax'
+    })
+
+    req.id = user.id;
+    next();
+
+  })
+
+ 
+
+}
+
 module.exports = {
   signUp,
   logIn,
   verifyToken,
-  getUser
+  getUser,
+  refreshToken
 };
